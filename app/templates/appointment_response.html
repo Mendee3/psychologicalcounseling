@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block title %}Уулзалтын хүсэлт{% endblock %}
+{% block body %}
+<div class="shell shell-public">
+  <section class="panel response-panel">
+    <p class="eyebrow">Сэтгэлзүйчийн шийдвэр</p>
+    <h1>Уулзалтын хүсэлт</h1>
+    <div class="detail-grid">
+      <div><span>Ажилтан</span><strong>{{ appointment.client_name }}</strong></div>
+      <div><span>Утас</span><strong>{{ appointment.client_phone }}</strong></div>
+      <div><span>И-мэйл</span><strong>{{ appointment.client_email or '-' }}</strong></div>
+      <div><span>Сэтгэлзүйч</span><strong>{{ appointment.counselor.name }}</strong></div>
+      <div><span>Огноо</span><strong>{{ appointment.slot.slot_date.isoformat() }}</strong></div>
+      <div><span>Цаг</span><strong>{{ appointment.slot.label }}</strong></div>
+      <div><span>Сэдэв</span><strong>{{ appointment.topic or '-' }}</strong></div>
+      <div><span>Төлөв</span><strong>{{ appointment.status }}</strong></div>
+    </div>
+    {% if appointment.notes %}
+    <div class="bio-card"><strong>Тэмдэглэл</strong><p>{{ appointment.notes }}</p></div>
+    {% endif %}
+
+    {% if result == 'confirmed' %}
+    <div class="notice success">Хүсэлтийг зөвшөөрлөө.</div>
+    {% elif result == 'declined' %}
+    <div class="notice warn">Хүсэлтийг татгалзлаа.</div>
+    {% elif result == 'done' %}
+    <div class="notice warn">Энэ хүсэлт өмнө нь шийдвэрлэгдсэн байна.</div>
+    {% elif result == 'invalid' %}
+    <div class="notice warn">Үйлдэл буруу байна.</div>
+    {% endif %}
+
+
+    {% if notify == 'mail_sent' %}
+    <div class="notice success">Ажилтанд и-мэйл мэдэгдэл илгээгдлээ.</div>
+    {% elif notify == 'mail_failed' %}
+    <div class="notice warn">Шийдвэр хадгалагдсан боловч ажилтанд и-мэйл илгээж чадсангүй.</div>
+    {% endif %}
+
+    {% if result in ['confirmed', 'declined', 'done'] %}
+    <div class="notice success">Шийдвэрлэсэн тул энэ цонхыг одоо хаана уу.</div>
+    {% endif %}
+    {% if appointment.status == 'requested' %}
+    <form method="post" class="decision-actions">
+      <button type="submit" name="action" value="accept">Зөвшөөрөх</button>
+      <button type="submit" name="action" value="refuse" class="secondary">Татгалзах</button>
+    </form>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

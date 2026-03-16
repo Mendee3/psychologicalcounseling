@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+{% block title %}Админ самбар{% endblock %}
+{% block body %}
+<div class="shell admin-shell">
+  <header class="admin-header">
+    <div>
+      <p class="eyebrow">Админ</p>
+      <h1>Уулзалтын удирдлага</h1>
+    </div>
+    <form method="post" action="{{ url_for('admin.logout') }}">
+      <button type="submit" class="secondary">Гарах</button>
+    </form>
+  </header>
+
+  {% if message %}<div class="notice success">{{ message }}</div>{% endif %}
+  {% if error %}<div class="notice warn">{{ error }}</div>{% endif %}
+
+  <details class="panel accordion-panel">
+    <summary class="accordion-summary">
+      <span>Сэтгэлзүйчдийн жагсаалт</span>
+      <span class="accordion-hint">Нээх/хаах</span>
+    </summary>
+    <div class="accordion-body">
+      <div class="section-head">
+        <h2>Сэтгэлзүйчдийн жагсаалт</h2>
+        <div class="content-head-pill">{{ counselors|length }} бүртгэл</div>
+      </div>
+      <div class="admin-counselor-grid">
+        {% for counselor in counselors %}
+        <article class="admin-counselor-card">
+          <div class="admin-counselor-photo-wrap">
+            {% if counselor.photo_path %}
+            <img src="{{ url_for('static', filename=counselor.photo_path) }}" alt="{{ counselor.name }}" class="admin-counselor-photo" />
+            {% else %}
+            <div class="admin-counselor-photo admin-counselor-photo-fallback">{{ counselor.name[:1] }}</div>
+            {% endif %}
+          </div>
+          <div class="admin-counselor-body">
+            <strong>{{ counselor.name }}</strong>
+            <p>{{ counselor.title }}</p>
+            <p>{{ counselor.email }}</p>
+            <p>{{ counselor.location or 'Байршил тохируулаагүй' }}</p>
+            <div class="chip-row">
+              <span class="pill">{{ counselor.session_minutes }} минут</span>
+              <span class="pill">{{ 'Идэвхтэй' if counselor.active else 'Хаалттай' }}</span>
+            </div>
+            <form method="post" action="{{ url_for('admin.update_counselor_status', counselor_id=counselor.id) }}">
+              <input type="hidden" name="active" value="{{ 'false' if counselor.active else 'true' }}" />
+              <button type="submit" class="secondary small">{{ 'Идэвхгүй болгох' if counselor.active else 'Дахин идэвхжүүлэх' }}</button>
+            </form>
+          </div>
+        </article>
+        {% else %}
+        <p>Одоогоор сэтгэлзүйч бүртгэгдээгүй байна.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </details>
+
+  <div class="accordion-grid admin-grid admin-grid-largeleft">
+    <details class="panel accordion-panel" open>
+      <summary class="accordion-summary">
+        <span>Цагийн слот олноор нэмэх</span>
+        <span class="accordion-hint">Нээх/хаах</span>
+      </summary>
+      <div class="accordion-body">
+        <p class="form-help">Олон өдөрт нэг ижил хуваарь гаргах боломжтой. Жишээ нь 2026-03-16-аас 2026-03-20 хүртэл, 09:00-12:00, 50 минут, завсар 10 минут гэвэл өдөр бүр автоматаар слотууд үүснэ.</p>
+        <form method="post" action="{{ url_for('admin.add_slot') }}" class="stack-form">
+          <label>Сэтгэлзүйч сонгох
+            <select name="counselor_id" required>
+              <option value="">Сэтгэлзүйч сонгох</option>
+              {% for counselor in counselors %}
+              <option value="{{ counselor.id }}">{{ counselor.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Эхлэх өдөр<input type="date" name="start_date" value="{{ today }}" required /></label>
+          <label>Дуусах өдөр<input type="date" name="end_date" value="{{ today }}" required /></label>
+          <label>Өдөр бүрийн эхлэх цаг<input type="time" name="range_start" required /></label>
+          <label>Өдөр бүрийн дуусах цаг<input type="time" name="range_end" required /></label>
+          <label>Нэг слотын үргэлжлэх хугацаа<input type="number" name="session_minutes" min="15" value="50" required /></label>
+          <label>Слот хоорондын завсар<input type="number" name="buffer_minutes" min="0" value="10" required /></label>
+          <label>Нэг слотод багтах хүний тоо<input type="number" name="capacity" min="1" value="1" required /></label>
+          <button type="submit">Слотууд үүсгэх</button>
+        </form>
+      </div>
+    </details>
+
+    <details class="panel accordion-panel" open>
+      <summary class="accordion-summary">
+        <span>Сэтгэлзүйч нэмэх</span>
+        <span class="accordion-hint">Нээх/хаах</span>
+      </summary>
+      <div class="accordion-body">
+        <p class="form-help">Энд бүртгэсэн и-мэйл рүү уулзалтын хүсэлтийн зөвшөөрөх, татгалзах холбоос очно.</p>
+        <form method="post" action="{{ url_for('admin.add_counselor') }}" class="stack-form" enctype="multipart/form-data">
+          <label>Сэтгэлзүйчийн нэр<input name="name" placeholder="Жишээ: Н. Саруул" required /></label>
+          <label>Албан тушаал<input name="title" placeholder="Жишээ: Клиник сэтгэлзүйч" required /></label>
+          <label>И-мэйл хаяг<input name="email" type="email" placeholder="name@company.mn" required /></label>
+          <label>Байршил<input name="location" placeholder="Жишээ: 5-р давхар, 502 тоот" /></label>
+          <label>Нэг уулзалтын үргэлжлэх хугацаа<input name="session_minutes" type="number" min="15" value="50" required /></label>
+          <label>Зураг оруулах<input name="photo" type="file" accept=".jpg,.jpeg,.png,.gif,.webp,image/*" /></label>
+          <label>Танилцуулга<textarea name="bio" placeholder="Сэтгэлзүйчийн товч танилцуулга"></textarea></label>
+          <label class="checkbox"><input type="checkbox" name="active" checked /> Идэвхтэй харагдах</label>
+          <button type="submit">Сэтгэлзүйч хадгалах</button>
+        </form>
+      </div>
+    </details>
+  </div>
+
+  <details class="panel accordion-panel">
+    <summary class="accordion-summary">
+      <span>Слот удирдах</span>
+      <span class="accordion-hint">Нээх/хаах</span>
+    </summary>
+    <div class="accordion-body">
+      <div class="section-head">
+        <h2>Слот удирдах</h2>
+        <form method="get" class="inline-filter inline-filter-wrap">
+          <label>Эхлэх өдөр<input type="date" name="slot_start" value="{{ slot_start }}" /></label>
+          <label>Дуусах өдөр<input type="date" name="slot_end" value="{{ slot_end }}" /></label>
+          <label>Сэтгэлзүйч
+            <select name="slot_counselor_id">
+              <option value="">Бүгд</option>
+              {% for counselor in counselors %}
+              <option value="{{ counselor.id }}" {% if slot_counselor_id == counselor.id %}selected{% endif %}>{{ counselor.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <button type="submit" class="secondary">Шүүх</button>
+        </form>
+      </div>
+      <form method="post" action="{{ url_for('admin.bulk_delete_slots') }}" class="inline-danger-form">
+        <input type="hidden" name="slot_start" value="{{ slot_start }}" />
+        <input type="hidden" name="slot_end" value="{{ slot_end }}" />
+        <input type="hidden" name="slot_counselor_id" value="{{ slot_counselor_id or '' }}" />
+        <button type="submit" class="secondary danger">Шүүсэн слотуудыг бөөнөөр устгах</button>
+      </form>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Огноо</th>
+              <th>Цаг</th>
+              <th>Сэтгэлзүйч</th>
+              <th>Багтаамж</th>
+              <th>Үйлдэл</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for slot in slots %}
+            <tr>
+              <td>{{ slot.slot_date.isoformat() }}</td>
+              <td>{{ slot.label }}</td>
+              <td>{{ slot.counselor.name }}</td>
+              <td>{{ slot.capacity }}</td>
+              <td>
+                <form method="post" action="{{ url_for('admin.delete_slot', slot_id=slot.id) }}">
+                  <button type="submit" class="secondary small danger">Устгах</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5">Сонгосон мужид слот алга.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+
+  <details class="panel accordion-panel">
+    <summary class="accordion-summary">
+      <span>Уулзалтын тайлан</span>
+      <span class="accordion-hint">Нээх/хаах</span>
+    </summary>
+    <div class="accordion-body">
+      <div class="section-head">
+        <h2>Уулзалтын тайлан</h2>
+        <form method="get" class="inline-filter inline-filter-wrap">
+          <label>Эхлэх өдөр<input type="date" name="report_start" value="{{ report_start }}" /></label>
+          <label>Дуусах өдөр<input type="date" name="report_end" value="{{ report_end }}" /></label>
+          <button type="submit" class="secondary">Тайлан харах</button>
+          <a class="card-action card-action-static" href="{{ url_for('admin.export_meetings_report', report_start=report_start, report_end=report_end) }}">XLSX татах</a>
+        </form>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Сэтгэлзүйч</th>
+              <th>Албан тушаал</th>
+              <th>Уулзалтын тоо</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in report_rows %}
+            <tr>
+              <td>{{ row.name }}</td>
+              <td>{{ row.title }}</td>
+              <td>{{ row.meeting_count }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3">Тайлангийн өгөгдөл алга.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+
+  <details class="panel accordion-panel">
+    <summary class="accordion-summary">
+      <span>Админ эрх олгох</span>
+      <span class="accordion-hint">Нээх/хаах</span>
+    </summary>
+    <div class="accordion-body">
+      <form method="post" action="{{ url_for('admin.add_admin') }}" class="stack-form">
+        <input name="username" placeholder="Нэвтрэх нэр" required />
+        <input name="password" type="password" placeholder="Нууц үг" required />
+        <button type="submit">Админ нэмэх</button>
+      </form>
+    </div>
+  </details>
+
+  <details class="panel accordion-panel">
+    <summary class="accordion-summary">
+      <span>Одоогийн админууд</span>
+      <span class="accordion-hint">Нээх/хаах</span>
+    </summary>
+    <div class="accordion-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Нэвтрэх нэр</th>
+              <th>Төлөв</th>
+              <th>Үйлдэл</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for admin_user in admin_users %}
+            <tr>
+              <td>{{ admin_user.username }}{% if admin_user.id == current_user.id %} (та){% endif %}</td>
+              <td>{{ 'Идэвхтэй' if admin_user.active else 'Хаалттай' }}</td>
+              <td>
+                <form method="post" action="{{ url_for('admin.update_admin_status', admin_id=admin_user.id) }}">
+                  <input type="hidden" name="active" value="{{ 'false' if admin_user.active else 'true' }}" />
+                  <button type="submit" class="secondary small">{{ 'Идэвхгүй болгох' if admin_user.active else 'Дахин идэвхжүүлэх' }}</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3">Админ хэрэглэгч алга.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+
+  <details class="panel accordion-panel" open>
+    <summary class="accordion-summary">
+      <span>Сүүлийн хүсэлтүүд</span>
+      <span class="accordion-hint">Нээх/хаах</span>
+    </summary>
+    <div class="accordion-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Огноо</th>
+              <th>Цаг</th>
+              <th>Сэтгэлзүйч</th>
+              <th>Ажилтан</th>
+              <th>Утас</th>
+              <th>Төлөв</th>
+              <th>Үйлдэл</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for appointment in appointments %}
+            <tr>
+              <td>{{ appointment.slot.slot_date.isoformat() }}</td>
+              <td>{{ appointment.slot.label }}</td>
+              <td>{{ appointment.counselor.name }}</td>
+              <td>{{ appointment.client_name }}</td>
+              <td>{{ appointment.client_phone }}</td>
+              <td>{{ appointment.status }}</td>
+              <td>
+                <form method="post" action="{{ url_for('admin.update_appointment_status', appointment_id=appointment.id) }}">
+                  <select name="status">
+                    {% for status in ['requested', 'confirmed', 'declined', 'completed', 'cancelled'] %}
+                    <option value="{{ status }}" {% if appointment.status == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="secondary small">Шинэчлэх</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">Одоогоор хүсэлт алга.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+</div>
+{% endblock %}

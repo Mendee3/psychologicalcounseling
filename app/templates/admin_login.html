@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}Админ нэвтрэх{% endblock %}
+{% block body %}
+<div class="shell login-shell">
+  <form method="post" class="login-card">
+    <h1>Админ нэвтрэх</h1>
+    <p>Сэтгэлзүйн уулзалтын хуваарь удирдах хэсэг.</p>
+    {% if error %}<div class="notice warn">{{ error }}</div>{% endif %}
+    <label>Нэвтрэх нэр<input name="username" required /></label>
+    <label>Нууц үг<input type="password" name="password" required /></label>
+    <button type="submit">Нэвтрэх</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+{% block title %}MindCare Лавлах{% endblock %}
+{% block body %}
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="brand-mark"></div>
+    <strong>psychologicalcounseling</strong>
+  </div>
+  <div class="topbar-center"></div>
+  <div class="topbar-user"></div>
+</div>
+
+<div class="shell directory-shell">
+  <section class="directory-header">
+    <div>
+      <h1>Сэтгэлзүйчтэй цаг товлох</h1>
+      <p>Сэтгэлзүйчээ сонгоод, боломжит өдөр цагаа сонгоод уулзалт товлох хүсэлт илгээнэ үү.</p>
+    </div>
+  </section>
+
+  <section class="directory-searchbar panel">
+    <input id="directorySearch" type="search" placeholder="Нэр, албан тушаал, байршлаар хайх..." />
+  </section>
+
+  <section class="directory-layout">
+    <aside class="panel sidebar-panel">
+      <div class="sidebar-block">
+        <div class="sidebar-title-row">
+          <h2>Уулзалт товлох</h2>
+          <span class="muted-tag">{{ counselor_summaries|length }} сэтгэлзүйч</span>
+        </div>
+        <p class="sidebar-copy">Сонгосон сэтгэлзүйчийн боломжит цагууд сонгосон өдрөөр шинэчлэгдэнэ.</p>
+      </div>
+
+      <div class="sidebar-block selected-counselor-block">
+        {% if counselor.photo_path %}
+        <img src="{{ url_for('static', filename=counselor.photo_path) }}" alt="{{ counselor.name }}" class="selected-avatar-image" />
+        {% else %}
+        <div class="selected-avatar">{{ counselor.name[:1] }}</div>
+        {% endif %}
+        <div>
+          <strong>{{ counselor.name }}</strong>
+          <p>{{ counselor.title }}</p>
+          <p>{{ counselor.location or 'Байршлыг дараа тохирно' }}</p>
+        </div>
+      </div>
+
+      <form method="post" action="{{ url_for('public.book') }}" class="stack-form booking-stack-form">
+        <input type="hidden" name="counselor_id" value="{{ counselor.id }}" />
+        <label>
+          Уулзалтын огноо
+          <input id="selected_date" type="date" name="selected_date" value="{{ selected_date }}" min="{{ today }}" required />
+        </label>
+        <label>
+          Боломжит цаг
+          <select id="slot_id" name="slot_id" required>
+            <option value="">Цаг сонгоно уу</option>
+            {% for slot in slots %}
+            <option value="{{ slot.id }}">{{ slot.label }} · {{ slot.remaining }} сул</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Овог нэр
+          <input id="client_name" name="client_name" required />
+        </label>
+        <label>
+          Утасны дугаар
+          <input id="client_phone" name="client_phone" required />
+        </label>
+        <label>
+          И-мэйл
+          <input id="client_email" name="client_email" type="email" required />
+        </label>
+        <label>
+          Сэдэв
+          <input id="topic" name="topic" placeholder="Стресс, харилцаа, ажлын ачаалал..." />
+        </label>
+        <label>
+          Нэмэлт тэмдэглэл
+          <textarea id="notes" name="notes" rows="4"></textarea>
+        </label>
+        <button type="submit">Уулзалтын хүсэлт илгээх</button>
+      </form>
+
+      {% if booked == 'requested' %}
+      <div class="notice success">Хүсэлт амжилттай илгээгдлээ. Сэтгэлзүйч и-мэйлээр зөвшөөрөх эсвэл татгалзана.</div>
+      {% elif booked == 'full' %}
+      <div class="notice warn">Энэ цаг дүүрсэн байна. Өөр цаг сонгоно уу.</div>
+      {% elif booked == 'mail_error' %}
+      <div class="notice warn">Хүсэлт хадгалагдсан боловч и-мэйл илгээгдсэнгүй. SMTP тохиргоог шалгана уу.</div>
+      {% elif booked == 'email_required' %}
+      <div class="notice warn">Хүсэлтийн хариуг хүлээн авахын тулд и-мэйл хаяг заавал бөглөнө үү.</div>
+      {% endif %}
+    </aside>
+
+    <div class="directory-content">
+      <div class="directory-content-head">
+        <strong><span id="resultCount">{{ counselor_summaries|length }}</span> сэтгэлзүйч олдлоо</strong>
+        <div class="content-head-pill">Санал болгож буй</div>
+      </div>
+
+      <div class="counselor-directory-grid" id="counselorGrid">
+        {% for item in counselor_summaries %}
+        <a
+          class="directory-card directory-card-link {% if item.id == counselor.id %}selected{% endif %}"
+          data-search="{{ (item.name ~ ' ' ~ item.title ~ ' ' ~ item.location ~ ' ' ~ item.bio)|lower }}"
+          href="{{ url_for('public.home', counselor_id=item.id, date=selected_date) }}"
+        >
+          <div class="directory-card-photo">
+            {% if item.photo_path %}
+            <img src="{{ url_for('static', filename=item.photo_path) }}" alt="{{ item.name }}" class="directory-card-photo-image" />
+            {% else %}
+            <div class="directory-card-photo-inner">{{ item.name[:1] }}</div>
+            {% endif %}
+          </div>
+          <div class="directory-card-body">
+            <h3>{{ item.name }}</h3>
+            <p class="card-subtitle">{{ item.title }}</p>
+            <div class="availability-row">{{ item.available_count }} боломжит слот</div>
+            <p class="card-description">{{ item.bio or 'Ажилтнуудад зориулсан нууцлалтай сэтгэлзүйн зөвлөгөө.' }}</p>
+            <div class="chip-row">
+              <span class="pill">{{ item.session_minutes }} минут</span>
+              <span class="pill">{{ item.location or 'Биечлэн' }}</span>
+            </div>
+            <div class="card-action card-action-static">Сонгох</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+</div>
+<script>
+  const dateInput = document.getElementById('selected_date');
+  const slotSelect = document.getElementById('slot_id');
+  const searchInput = document.getElementById('directorySearch');
+  const cards = Array.from(document.querySelectorAll('.directory-card'));
+  const resultCount = document.getElementById('resultCount');
+
+  async function refreshSlots() {
+    if (!dateInput.value) return;
+    const res = await fetch(`/api/slots?counselor_id={{ counselor.id }}&date=${encodeURIComponent(dateInput.value)}`);
+    const rows = await res.json();
+    slotSelect.innerHTML = '<option value="">Цаг сонгоно уу</option>';
+    for (const row of rows) {
+      const opt = document.createElement('option');
+      opt.value = row.id;
+      opt.textContent = `${row.label} · ${row.remaining} сул`;
+      slotSelect.appendChild(opt);
+    }
+  }
+
+  function filterCards() {
+    const keyword = searchInput.value.trim().toLowerCase();
+    let visible = 0;
+    cards.forEach((card) => {
+      const match = !keyword || card.dataset.search.includes(keyword);
+      card.style.display = match ? '' : 'none';
+      if (match) visible += 1;
+    });
+    resultCount.textContent = String(visible);
+  }
+
+  dateInput.addEventListener('change', refreshSlots);
+  searchInput.addEventListener('input', filterCards);
+</script>
+{% endblock %}
