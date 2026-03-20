@@ -7,15 +7,18 @@
       <p class="eyebrow">Админ</p>
       <h1>Уулзалтын удирдлага</h1>
     </div>
-    <form method="post" action="{{ url_for('admin.logout') }}">
-      <button type="submit" class="secondary">Гарах</button>
-    </form>
+    <div class="chip-row">
+      <a href="{{ url_for('public.home') }}" class="card-action secondary">Нүүр хуудас</a>
+      <form method="post" action="{{ url_for('admin.logout') }}">
+        <button type="submit" class="secondary">Гарах</button>
+      </form>
+    </div>
   </header>
 
   {% if message %}<div class="notice success">{{ message }}</div>{% endif %}
   {% if error %}<div class="notice warn">{{ error }}</div>{% endif %}
 
-  <details class="panel accordion-panel">
+  <details class="panel accordion-panel" id="counselor-list" {% if open_section == 'counselors' %}open{% endif %}>
     <summary class="accordion-summary">
       <span>Сэтгэлзүйчдийн жагсаалт</span>
       <span class="accordion-hint">Нээх/хаах</span>
@@ -23,16 +26,19 @@
     <div class="accordion-body">
       <div class="section-head">
         <h2>Сэтгэлзүйчдийн жагсаалт</h2>
-        <div class="content-head-pill">{{ counselors|length }} бүртгэл</div>
+        <div class="chip-row">
+          <div class="content-head-pill">{{ counselors|length }} бүртгэл</div>
+          <div class="content-head-pill">Устгах товч карт бүр дээр бий</div>
+        </div>
       </div>
       <div class="admin-counselor-grid">
         {% for counselor in counselors %}
         <article class="admin-counselor-card">
           <div class="admin-counselor-photo-wrap">
             {% if counselor.photo_path %}
-            <img src="{{ url_for('static', filename=counselor.photo_path) }}" alt="{{ counselor.name }}" class="admin-counselor-photo" />
+            <img src="{{ url_for('static', filename=counselor.photo_path) }}" alt="{{ counselor.name }}" class="admin-counselor-photo-image" />
             {% else %}
-            <div class="admin-counselor-photo admin-counselor-photo-fallback">{{ counselor.name[:1] }}</div>
+            <div class="admin-counselor-photo-fallback">{{ counselor.name[:1] }}</div>
             {% endif %}
           </div>
           <div class="admin-counselor-body">
@@ -44,10 +50,14 @@
               <span class="pill">{{ counselor.session_minutes }} минут</span>
               <span class="pill">{{ 'Идэвхтэй' if counselor.active else 'Хаалттай' }}</span>
             </div>
-            <form method="post" action="{{ url_for('admin.update_counselor_status', counselor_id=counselor.id) }}">
-              <input type="hidden" name="active" value="{{ 'false' if counselor.active else 'true' }}" />
-              <button type="submit" class="secondary small">{{ 'Идэвхгүй болгох' if counselor.active else 'Дахин идэвхжүүлэх' }}</button>
-            </form>
+            <div class="admin-counselor-actions">
+              <a href="{{ url_for('admin.edit_counselor', counselor_id=counselor.id) }}" class="card-action secondary small">Засах</a>
+              <form method="post" action="{{ url_for('admin.update_counselor_status', counselor_id=counselor.id) }}">
+                <input type="hidden" name="active" value="{{ 'false' if counselor.active else 'true' }}" />
+                <button type="submit" class="secondary small">{{ 'Идэвхгүй болгох' if counselor.active else 'Дахин идэвхжүүлэх' }}</button>
+              </form>
+              <a href="{{ url_for('admin.confirm_delete_counselor', counselor_id=counselor.id) }}" class="card-action secondary small danger">Устгах</a>
+            </div>
           </div>
         </article>
         {% else %}
@@ -99,7 +109,8 @@
           <label>И-мэйл хаяг<input name="email" type="email" placeholder="name@company.mn" required /></label>
           <label>Байршил<input name="location" placeholder="Жишээ: 5-р давхар, 502 тоот" /></label>
           <label>Нэг уулзалтын үргэлжлэх хугацаа<input name="session_minutes" type="number" min="15" value="50" required /></label>
-          <label>Зураг оруулах<input name="photo" type="file" accept=".jpg,.jpeg,.png,.gif,.webp,image/*" /></label>
+          <label>Зураг оруулах<input name="photo" type="file" accept=".jpg,.jpeg,.png,.gif,.webp,image/*" data-photo-crop /></label>
+          <p class="form-help">Том зураг сонговол илгээхээс өмнө тайрч, хэмжээг нь багасгах цонх автоматаар гарна.</p>
           <label>Танилцуулга<textarea name="bio" placeholder="Сэтгэлзүйчийн товч танилцуулга"></textarea></label>
           <label class="checkbox"><input type="checkbox" name="active" checked /> Идэвхтэй харагдах</label>
           <button type="submit">Сэтгэлзүйч хадгалах</button>
@@ -108,7 +119,7 @@
     </details>
   </div>
 
-  <details class="panel accordion-panel">
+  <details class="panel accordion-panel" id="slot-management" {% if open_section == 'slots' %}open{% endif %}>
     <summary class="accordion-summary">
       <span>Слот удирдах</span>
       <span class="accordion-hint">Нээх/хаах</span>
@@ -116,7 +127,8 @@
     <div class="accordion-body">
       <div class="section-head">
         <h2>Слот удирдах</h2>
-        <form method="get" class="inline-filter inline-filter-wrap">
+        <form method="get" action="{{ url_for('admin.dashboard') }}#slot-management" class="inline-filter inline-filter-wrap">
+          <input type="hidden" name="open_section" value="slots" />
           <label>Эхлэх өдөр<input type="date" name="slot_start" value="{{ slot_start }}" /></label>
           <label>Дуусах өдөр<input type="date" name="slot_end" value="{{ slot_end }}" /></label>
           <label>Сэтгэлзүйч
@@ -169,7 +181,7 @@
     </div>
   </details>
 
-  <details class="panel accordion-panel">
+  <details class="panel accordion-panel" id="meeting-report" {% if open_section == 'reports' %}open{% endif %}>
     <summary class="accordion-summary">
       <span>Уулзалтын тайлан</span>
       <span class="accordion-hint">Нээх/хаах</span>
@@ -177,7 +189,8 @@
     <div class="accordion-body">
       <div class="section-head">
         <h2>Уулзалтын тайлан</h2>
-        <form method="get" class="inline-filter inline-filter-wrap">
+        <form method="get" action="{{ url_for('admin.dashboard') }}#meeting-report" class="inline-filter inline-filter-wrap">
+          <input type="hidden" name="open_section" value="reports" />
           <label>Эхлэх өдөр<input type="date" name="report_start" value="{{ report_start }}" /></label>
           <label>Дуусах өдөр<input type="date" name="report_end" value="{{ report_end }}" /></label>
           <button type="submit" class="secondary">Тайлан харах</button>
@@ -220,6 +233,79 @@
         <input name="password" type="password" placeholder="Нууц үг" required />
         <button type="submit">Админ нэмэх</button>
       </form>
+    </div>
+  </details>
+
+  <details class="panel accordion-panel">
+    <summary class="accordion-summary">
+      <span>Сэтгэлзүйчийн эрх ба зөвлөмж</span>
+      <span class="accordion-hint">Нээх/хаах</span>
+    </summary>
+    <div class="accordion-body">
+      <div class="admin-grid">
+        <div>
+          <div class="section-head">
+            <h2>Сэтгэлзүйчийн нэвтрэх эрх</h2>
+          </div>
+          <p class="form-help">Энэ эрхээр сэтгэлзүйч зөвхөн өөрийн уулзалтын түүх, статистик, төлөв шинэчлэлтийг харна.</p>
+          <form method="post" action="{{ url_for('admin.upsert_counselor_user') }}" class="stack-form">
+            <label>Сэтгэлзүйч
+              <select name="counselor_id" required>
+                <option value="">Сэтгэлзүйч сонгох</option>
+                {% for counselor in counselors %}
+                <option value="{{ counselor.id }}">{{ counselor.name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>Нэвтрэх нэр<input name="username" required /></label>
+            <label>Нууц үг<input name="password" type="password" required /></label>
+            <button type="submit">Эрх хадгалах</button>
+          </form>
+
+          <div class="table-wrap top-spacer">
+            <table>
+              <thead>
+                <tr>
+                  <th>Сэтгэлзүйч</th>
+                  <th>Нэвтрэх нэр</th>
+                  <th>Төлөв</th>
+                  <th>Үйлдэл</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for user in counselor_users %}
+                <tr>
+                  <td>{{ user.counselor.name if user.counselor else '-' }}</td>
+                  <td>{{ user.username }}</td>
+                  <td>{{ 'Идэвхтэй' if user.active else 'Хаалттай' }}</td>
+                  <td>
+                    <form method="post" action="{{ url_for('admin.update_counselor_user_status', user_id=user.id) }}">
+                      <input type="hidden" name="active" value="{{ 'false' if user.active else 'true' }}" />
+                      <button type="submit" class="secondary small">{{ 'Идэвхгүй болгох' if user.active else 'Дахин идэвхжүүлэх' }}</button>
+                    </form>
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4">Сэтгэлзүйчийн эрх хараахан үүсгээгүй байна.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-head">
+            <h2>Зөвлөмжийн самбар</h2>
+          </div>
+          <p class="form-help">Нүүр хуудасны зүүн талын Зөвлөмж товчоор нээгдэх богино зөвлөмжийг эндээс удирдана.</p>
+          <form method="post" action="{{ url_for('admin.update_recommendation') }}" class="stack-form">
+            <label class="checkbox"><input type="checkbox" name="enabled" {% if recommendation_enabled %}checked{% endif %} /> Нүүр хуудсанд харагдуулах</label>
+            <label>Гарчиг<input name="title" value="{{ recommendation_title }}" required /></label>
+            <label>Агуулга<textarea name="body" rows="8" placeholder="Шуурхай зөвлөмжийн агуулгыг энд оруулна.">{{ recommendation_body }}</textarea></label>
+            <button type="submit">Зөвлөмж хадгалах</button>
+          </form>
+        </div>
+      </div>
     </div>
   </details>
 
@@ -273,6 +359,7 @@
               <th>Цаг</th>
               <th>Сэтгэлзүйч</th>
               <th>Ажилтан</th>
+              <th>Алба хэлтэс</th>
               <th>Утас</th>
               <th>Төлөв</th>
               <th>Үйлдэл</th>
@@ -285,10 +372,11 @@
               <td>{{ appointment.slot.label }}</td>
               <td>{{ appointment.counselor.name }}</td>
               <td>{{ appointment.client_name }}</td>
+              <td>{{ appointment.client_department or '-' }}</td>
               <td>{{ appointment.client_phone }}</td>
               <td>{{ appointment.status }}</td>
               <td>
-                <form method="post" action="{{ url_for('admin.update_appointment_status', appointment_id=appointment.id) }}">
+                <form method="post" action="{{ url_for('admin.update_appointment_status_route', appointment_id=appointment.id) }}">
                   <select name="status">
                     {% for status in ['requested', 'confirmed', 'declined', 'completed', 'cancelled'] %}
                     <option value="{{ status }}" {% if appointment.status == status %}selected{% endif %}>{{ status }}</option>
@@ -299,7 +387,7 @@
               </td>
             </tr>
             {% else %}
-            <tr><td colspan="7">Одоогоор хүсэлт алга.</td></tr>
+            <tr><td colspan="8">Одоогоор хүсэлт алга.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -307,4 +395,5 @@
     </div>
   </details>
 </div>
+<script src="{{ url_for('static', filename='admin_photo_upload.js') }}"></script>
 {% endblock %}

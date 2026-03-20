@@ -7,7 +7,7 @@ from flask import Blueprint, jsonify, redirect, render_template, request, url_fo
 
 from . import db
 from .email_utils import send_appointment_decision_email, send_appointment_request_email
-from .models import Appointment, AvailabilitySlot, Counselor, DEFAULT_COUNSELOR
+from .models import AppSetting, Appointment, AvailabilitySlot, Counselor, DEFAULT_COUNSELOR
 
 public_bp = Blueprint("public", __name__)
 
@@ -68,6 +68,11 @@ def counselor_summaries(slot_date: date):
     return result
 
 
+def _setting(key: str, default: str = "") -> str:
+    row = AppSetting.query.filter_by(key=key).first()
+    return row.value if row else default
+
+
 @public_bp.get("/")
 def home():
     counselors = active_counselors()
@@ -82,10 +87,7 @@ def home():
 
     selected_id = request.args.get("counselor_id", type=int)
     selected_counselor = next((item for item in counselors if item.id == selected_id), None)
-    if not selected_counselor:
-        selected_counselor = counselors[0] if counselors else ensure_default_counselor()
-
-    slots = available_slots(selected_counselor.id, selected_date)
+    slots = available_slots(selected_counselor.id, selected_date) if selected_counselor else []
     return render_template(
         "public.html",
         counselors=counselors,
@@ -95,6 +97,9 @@ def home():
         selected_date=selected_date_raw,
         slots=slots,
         booked=request.args.get("booked", ""),
+        recommendation_enabled=_setting("recommendation_enabled", "true") == "true",
+        recommendation_title=_setting("recommendation_title", "Зөвлөмж"),
+        recommendation_body=_setting("recommendation_body", "Танд яаралтай дэмжлэг хэрэгтэй бол хамгийн ойрын сэтгэлзүйчээ сонгон уулзалтын хүсэлт илгээнэ үү."),
     )
 
 
@@ -116,6 +121,7 @@ def book():
     counselor_id = request.form.get("counselor_id", type=int)
     slot_id = request.form.get("slot_id", type=int)
     client_name = request.form.get("client_name", "").strip()
+    client_department = request.form.get("client_department", "").strip()
     client_phone = request.form.get("client_phone", "").strip()
     client_email = request.form.get("client_email", "").strip()
     topic = request.form.get("topic", "").strip()
@@ -141,6 +147,7 @@ def book():
         counselor_id=counselor.id,
         slot_id=slot.id,
         client_name=client_name,
+        client_department=client_department,
         client_phone=client_phone,
         client_email=client_email,
         topic=topic,

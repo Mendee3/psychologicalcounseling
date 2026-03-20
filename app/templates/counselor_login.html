@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}Сэтгэлзүйч нэвтрэх{% endblock %}
+{% block body %}
+<div class="login-shell">
+  <form method="post" class="login-card">
+    <div>
+      <p class="eyebrow">Сэтгэлзүйч</p>
+      <h1>Өөрийн уулзалтууд руу нэвтрэх</h1>
+      <p class="form-help">Эндээс зөвхөн өөрийн уулзалтын төлөв, статистик, түүхээ харна.</p>
+    </div>
+    {% if error %}<div class="notice warn">{{ error }}</div>{% endif %}
+    <label>Нэвтрэх нэр<input name="username" required autofocus /></label>
+    <label>Нууц үг<input name="password" type="password" required /></label>
+    <button type="submit">Нэвтрэх</button>
+    <a class="card-action secondary" href="{{ url_for('public.home') }}">Нүүр хуудас руу буцах</a>
+  </form>
+</div>
+{% endblock %}

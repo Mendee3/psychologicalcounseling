@@ -43,6 +43,7 @@ def send_appointment_request_email(appointment: Appointment) -> None:
 Шинэ уулзалтын хүсэлт ирлээ.
 
 Ажилтан: {appointment.client_name}
+Алба хэлтэс: {appointment.client_department or '-'}
 Утас: {appointment.client_phone}
 И-мэйл: {appointment.client_email or '-'}
 Огноо: {appointment.slot.slot_date.isoformat()}
@@ -81,12 +82,46 @@ def send_appointment_decision_email(appointment: Appointment) -> None:
 {summary}
 
 Сэтгэлзүйч: {appointment.counselor.name}
+Алба хэлтэс: {appointment.client_department or '-'}
 Огноо: {appointment.slot.slot_date.isoformat()}
 Цаг: {appointment.slot.label}
 Сэдэв: {appointment.topic or '-'}
 Одоогийн төлөв: {appointment.status}
 
 Шаардлагатай бол админтай эсвэл сэтгэлзүйчтэйгээ дахин холбогдоно уу.
+"""
+    )
+    _deliver(msg)
+
+
+def send_feedback_request_email(appointment: Appointment) -> None:
+    if not appointment.client_email or not _smtp_enabled():
+        return
+
+    feedback_url = os.getenv("PC_FEEDBACK_URL", "").strip()
+    feedback_line = (
+        f"Санал хүсэлт үлдээх холбоос: {feedback_url}"
+        if feedback_url
+        else "Санал хүсэлтээ энэ и-мэйлд хариу бичиж үлдээж болно."
+    )
+
+    msg = EmailMessage()
+    msg["Subject"] = "Сэтгэлзүйн уулзалтын санал хүсэлт"
+    msg["From"] = os.getenv("SMTP_FROM") or os.getenv("SMTP_USER")
+    msg["To"] = appointment.client_email
+    msg.set_content(
+        f"""Сайн байна уу, {appointment.client_name}.
+
+Таны {appointment.slot.slot_date.isoformat()}-ны {appointment.slot.label} цагийн уулзалт дууссан байна.
+
+Сэтгэлзүйч: {appointment.counselor.name}
+Алба хэлтэс: {appointment.client_department or '-'}
+Сэдэв: {appointment.topic or '-'}
+
+Үйлчилгээний чанарыг сайжруулахын тулд богино санал хүсэлт үлдээнэ үү.
+{feedback_line}
+
+Хэрэв дараагийн шатанд тусгай асуулгын маягт ашиглах бол энэ и-мэйл доторх холбоосыг шинэчилж ашиглаж болно.
 """
     )
     _deliver(msg)

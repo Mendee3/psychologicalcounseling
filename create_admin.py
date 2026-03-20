@@ -19,6 +19,7 @@ with app.app_context():
         user = AdminUser(username=username)
         db.session.add(user)
     user.set_password(password)
+    user.role = "admin"
     user.active = True
     db.session.commit()
     print(f"Admin user '{username}' is ready.")

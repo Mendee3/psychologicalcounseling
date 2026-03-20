@@ -12,8 +12,12 @@ class AdminUser(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(20), default="admin", nullable=False, index=True)
+    counselor_id = db.Column(db.Integer, db.ForeignKey("counselor.id"), nullable=True, index=True)
     active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    counselor = db.relationship("Counselor", backref="portal_users")
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
@@ -66,6 +70,7 @@ class Appointment(db.Model):
     counselor_id = db.Column(db.Integer, db.ForeignKey("counselor.id"), nullable=False, index=True)
     slot_id = db.Column(db.Integer, db.ForeignKey("availability_slot.id"), nullable=False, index=True)
     client_name = db.Column(db.String(120), nullable=False)
+    client_department = db.Column(db.String(160), default="", nullable=False)
     client_phone = db.Column(db.String(40), nullable=False)
     client_email = db.Column(db.String(120), default="", nullable=False)
     topic = db.Column(db.String(200), default="", nullable=False)
@@ -73,6 +78,8 @@ class Appointment(db.Model):
     status = db.Column(db.String(20), default="requested", nullable=False, index=True)
     decision_token = db.Column(db.String(64), unique=True, nullable=False)
     responded_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    feedback_sent_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     counselor = db.relationship("Counselor", backref="appointments")
@@ -81,6 +88,11 @@ class Appointment(db.Model):
     __table_args__ = (
         db.UniqueConstraint("slot_id", "client_phone", name="uq_slot_client_phone"),
     )
+
+
+class AppSetting(db.Model):
+    key = db.Column(db.String(80), primary_key=True)
+    value = db.Column(db.Text, default="", nullable=False)
 
 
 DEFAULT_COUNSELOR = {

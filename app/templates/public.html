@@ -7,8 +7,21 @@
     <strong>psychologicalcounseling</strong>
   </div>
   <div class="topbar-center"></div>
-  <div class="topbar-user"></div>
+  <div class="topbar-user">
+    <a class="card-action secondary small" href="{{ url_for('counselor.login') }}">Сэтгэлзүйч нэвтрэх</a>
+    <a class="card-action secondary small" href="{{ url_for('admin.login') }}">Админ</a>
+  </div>
 </div>
+
+{% if recommendation_enabled %}
+<aside class="recommendation-drawer" id="recommendationDrawer">
+  <button type="button" class="recommendation-toggle" id="recommendationToggle" aria-expanded="false" aria-controls="recommendationDrawerPanel">Зөвлөмж</button>
+  <div class="recommendation-panel" id="recommendationDrawerPanel">
+    <h2>{{ recommendation_title }}</h2>
+    <div class="recommendation-body">{{ recommendation_body|replace('\n', '<br />')|safe }}</div>
+  </div>
+</aside>
+{% endif %}
 
 <div class="shell directory-shell">
   <section class="directory-header">
@@ -29,9 +42,10 @@
           <h2>Уулзалт товлох</h2>
           <span class="muted-tag">{{ counselor_summaries|length }} сэтгэлзүйч</span>
         </div>
-        <p class="sidebar-copy">Сонгосон сэтгэлзүйчийн боломжит цагууд сонгосон өдрөөр шинэчлэгдэнэ.</p>
+        <p class="sidebar-copy">Эхлээд сэтгэлзүйчээ сонгоно. Сонголт хийсний дараа боломжит өдөр, цаг, уулзалтын хүсэлтийн маягт харагдана.</p>
       </div>
 
+      {% if counselor %}
       <div class="sidebar-block selected-counselor-block">
         {% if counselor.photo_path %}
         <img src="{{ url_for('static', filename=counselor.photo_path) }}" alt="{{ counselor.name }}" class="selected-avatar-image" />
@@ -65,6 +79,10 @@
           <input id="client_name" name="client_name" required />
         </label>
         <label>
+          Алба хэлтэс
+          <input id="client_department" name="client_department" placeholder="Жишээ: Санхүү, Хүний нөөц..." />
+        </label>
+        <label>
           Утасны дугаар
           <input id="client_phone" name="client_phone" required />
         </label>
@@ -82,6 +100,9 @@
         </label>
         <button type="submit">Уулзалтын хүсэлт илгээх</button>
       </form>
+      {% else %}
+      <div class="notice">Цагийн сонголт болон хүсэлтийн маягтыг харахын тулд баруун талаас сэтгэлзүйч сонгоно уу.</div>
+      {% endif %}
 
       {% if booked == 'requested' %}
       <div class="notice success">Хүсэлт амжилттай илгээгдлээ. Сэтгэлзүйч и-мэйлээр зөвшөөрөх эсвэл татгалзана.</div>
@@ -102,7 +123,7 @@
       <div class="counselor-directory-grid" id="counselorGrid">
         {% for item in counselor_summaries %}
         <a
-          class="directory-card directory-card-link {% if item.id == counselor.id %}selected{% endif %}"
+          class="directory-card directory-card-link {% if counselor and item.id == counselor.id %}selected{% endif %}"
           data-search="{{ (item.name ~ ' ' ~ item.title ~ ' ' ~ item.location ~ ' ' ~ item.bio)|lower }}"
           href="{{ url_for('public.home', counselor_id=item.id, date=selected_date) }}"
         >
@@ -131,15 +152,19 @@
   </section>
 </div>
 <script>
+  const counselorSelectionScrollKey = 'public-home-selection-scroll-y';
   const dateInput = document.getElementById('selected_date');
   const slotSelect = document.getElementById('slot_id');
   const searchInput = document.getElementById('directorySearch');
   const cards = Array.from(document.querySelectorAll('.directory-card'));
   const resultCount = document.getElementById('resultCount');
+  const recommendationToggle = document.getElementById('recommendationToggle');
+  const recommendationDrawer = document.getElementById('recommendationDrawer');
+  const selectedCounselorId = {{ counselor.id if counselor else 'null' }};
 
   async function refreshSlots() {
-    if (!dateInput.value) return;
-    const res = await fetch(`/api/slots?counselor_id={{ counselor.id }}&date=${encodeURIComponent(dateInput.value)}`);
+    if (!dateInput || !slotSelect || !dateInput.value || !selectedCounselorId) return;
+    const res = await fetch(`/api/slots?counselor_id=${selectedCounselorId}&date=${encodeURIComponent(dateInput.value)}`);
     const rows = await res.json();
     slotSelect.innerHTML = '<option value="">Цаг сонгоно уу</option>';
     for (const row of rows) {
@@ -161,7 +186,34 @@
     resultCount.textContent = String(visible);
   }
 
-  dateInput.addEventListener('change', refreshSlots);
+  function rememberScrollPosition() {
+    window.sessionStorage.setItem(counselorSelectionScrollKey, String(window.scrollY));
+  }
+
+  function restoreScrollPosition() {
+    const savedScrollY = window.sessionStorage.getItem(counselorSelectionScrollKey);
+    if (!savedScrollY) return;
+    window.sessionStorage.removeItem(counselorSelectionScrollKey);
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: Number(savedScrollY), behavior: 'auto' });
+    });
+  }
+
+  cards.forEach((card) => {
+    card.addEventListener('click', rememberScrollPosition);
+  });
+
+  if (recommendationToggle && recommendationDrawer) {
+    recommendationToggle.addEventListener('click', () => {
+      const isOpen = recommendationDrawer.classList.toggle('open');
+      recommendationToggle.setAttribute('aria-expanded', String(isOpen));
+    });
+  }
+
+  restoreScrollPosition();
+  if (dateInput) {
+    dateInput.addEventListener('change', refreshSlots);
+  }
   searchInput.addEventListener('input', filterCards);
 </script>
 {% endblock %}

@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Сэтгэлзүйч засах{% endblock %}
+{% block body %}
+<div class="shell admin-shell">
+  <header class="admin-header">
+    <div>
+      <p class="eyebrow">Админ</p>
+      <h1>Сэтгэлзүйч засах</h1>
+      <p class="form-help">{{ counselor.name }}</p>
+    </div>
+    <a href="{{ url_for('admin.dashboard') }}" class="card-action secondary">Буцах</a>
+  </header>
+
+  {% if error %}<div class="notice warn">{{ error }}</div>{% endif %}
+
+  <section class="panel delete-confirm-panel">
+    <div class="sidebar-block">
+      <h2>{{ counselor.name }}</h2>
+      <p class="sidebar-copy">{{ counselor.title }}</p>
+      <div class="chip-row">
+        <span class="pill">{{ 'Идэвхтэй' if counselor.active else 'Хаалттай' }}</span>
+        <span class="pill">{{ counselor.session_minutes }} минут</span>
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('admin.update_counselor', counselor_id=counselor.id) }}" class="stack-form" enctype="multipart/form-data">
+      <label>Сэтгэлзүйчийн нэр<input name="name" value="{{ counselor.name }}" required /></label>
+      <label>Албан тушаал<input name="title" value="{{ counselor.title }}" required /></label>
+      <label>И-мэйл хаяг<input name="email" type="email" value="{{ counselor.email }}" required /></label>
+      <label>Байршил<input name="location" value="{{ counselor.location }}" /></label>
+      <label>Нэг уулзалтын үргэлжлэх хугацаа<input name="session_minutes" type="number" min="15" value="{{ counselor.session_minutes }}" required /></label>
+      <label>Зураг солих<input name="photo" type="file" accept=".jpg,.jpeg,.png,.gif,.webp,image/*" data-photo-crop /></label>
+      <p class="form-help">Шинэ зураг сонгоогүй бол одоогийн зураг хэвээр хадгалагдана. Том зураг сонговол илгээхээс өмнө тайрч, хэмжээг нь багасгах цонх гарна.</p>
+      <label>Танилцуулга<textarea name="bio" placeholder="Сэтгэлзүйчийн товч танилцуулга">{{ counselor.bio }}</textarea></label>
+      <label class="checkbox"><input type="checkbox" name="active" {% if counselor.active %}checked{% endif %} /> Идэвхтэй харагдах</label>
+      <div class="delete-confirm-actions">
+        <button type="submit">Өөрчлөлт хадгалах</button>
+        <a href="{{ url_for('admin.dashboard') }}" class="card-action secondary">Цуцлах</a>
+      </div>
+    </form>
+  </section>
+</div>
+<script src="{{ url_for('static', filename='admin_photo_upload.js') }}"></script>
+{% endblock %}

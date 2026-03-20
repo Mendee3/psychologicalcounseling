@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Сэтгэлзүйч устгах{% endblock %}
+{% block body %}
+<div class="shell admin-shell">
+  <header class="admin-header">
+    <div>
+      <p class="eyebrow">Админ</p>
+      <h1>Сэтгэлзүйч устгах</h1>
+    </div>
+    <a href="{{ url_for('admin.dashboard') }}" class="card-action secondary">Буцах</a>
+  </header>
+
+  <section class="panel delete-confirm-panel">
+    <div class="sidebar-block">
+      <h2>{{ counselor.name }}</h2>
+      <p class="sidebar-copy">{{ counselor.title }}</p>
+      <div class="chip-row">
+        <span class="pill">{{ slot_count }} слот</span>
+        <span class="pill">{{ appointment_count }} уулзалт</span>
+      </div>
+    </div>
+
+    {% if can_delete %}
+    <div class="notice warn">
+      Энэ үйлдэл буцаагдахгүй. Та энэ сэтгэлзүйчийг бүр мөсөн устгахдаа итгэлтэй байна уу?
+    </div>
+    <form method="post" action="{{ url_for('admin.delete_counselor', counselor_id=counselor.id) }}" class="delete-confirm-actions">
+      <button type="submit" class="danger">Тийм, бүр мөсөн устгах</button>
+      <a href="{{ url_for('admin.dashboard') }}" class="card-action secondary">Цуцлах</a>
+    </form>
+    {% else %}
+    <div class="notice warn">
+      Энэ сэтгэлзүйч дээр слот эсвэл уулзалтын түүх байна. Тиймээс бүр мөсөн устгахгүй, харин идэвхгүй болгож нуух нь зөв.
+    </div>
+    <div class="delete-confirm-actions">
+      <form method="post" action="{{ url_for('admin.update_counselor_status', counselor_id=counselor.id) }}">
+        <input type="hidden" name="active" value="false" />
+        <button type="submit" class="secondary">Идэвхгүй болгох</button>
+      </form>
+      <a href="{{ url_for('admin.dashboard') }}" class="card-action secondary">Буцах</a>
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
