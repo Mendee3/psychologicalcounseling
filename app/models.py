@@ -13,7 +13,7 @@ class AdminUser(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), default="admin", nullable=False, index=True)
-    counselor_id = db.Column(db.Integer, db.ForeignKey("counselor.id"), nullable=True, index=True)
+    counselor_id = db.Column(db.Integer, db.ForeignKey("counselor.id", ondelete="SET NULL"), nullable=True, index=True)
     active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
@@ -46,7 +46,7 @@ class Counselor(db.Model):
 
 class AvailabilitySlot(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    counselor_id = db.Column(db.Integer, db.ForeignKey("counselor.id"), nullable=False, index=True)
+    counselor_id = db.Column(db.Integer, db.ForeignKey("counselor.id", ondelete="RESTRICT"), nullable=False, index=True)
     slot_date = db.Column(db.Date, nullable=False, index=True)
     start_time = db.Column(db.Time, nullable=False)
     end_time = db.Column(db.Time, nullable=False)
@@ -67,8 +67,8 @@ class AvailabilitySlot(db.Model):
 
 class Appointment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    counselor_id = db.Column(db.Integer, db.ForeignKey("counselor.id"), nullable=False, index=True)
-    slot_id = db.Column(db.Integer, db.ForeignKey("availability_slot.id"), nullable=False, index=True)
+    counselor_id = db.Column(db.Integer, db.ForeignKey("counselor.id", ondelete="RESTRICT"), nullable=False, index=True)
+    slot_id = db.Column(db.Integer, db.ForeignKey("availability_slot.id", ondelete="RESTRICT"), nullable=False, index=True)
     client_name = db.Column(db.String(120), nullable=False)
     client_department = db.Column(db.String(160), default="", nullable=False)
     client_phone = db.Column(db.String(40), nullable=False)

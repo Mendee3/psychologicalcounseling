@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 from pathlib import Path
 
-from flask import Flask, redirect, request, url_for
+from flask import Flask, redirect, url_for
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import inspect, text
+from sqlalchemy import event, inspect, text
+from sqlalchemy.engine import Engine
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -16,6 +18,62 @@ DB_PATH = BASE_DIR / "scheduler.db"
 db = SQLAlchemy()
 login_manager = LoginManager()
 login_manager.login_view = "admin.login"
+
+
+@event.listens_for(Engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, _connection_record) -> None:
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+
+def _ensure_admin_user_foreign_key(inspector) -> None:
+    foreign_keys = inspector.get_foreign_keys("admin_user")
+    has_counselor_fk = any(
+        fk.get("referred_table") == "counselor" and fk.get("constrained_columns") == ["counselor_id"]
+        for fk in foreign_keys
+    )
+    if has_counselor_fk:
+        return
+
+    db.session.execute(text("PRAGMA foreign_keys=OFF"))
+    db.session.execute(
+        text(
+            "UPDATE admin_user SET counselor_id = NULL WHERE counselor_id IS NOT NULL AND counselor_id NOT IN (SELECT id FROM counselor)"
+        )
+    )
+    db.session.execute(
+        text(
+            """
+            CREATE TABLE admin_user__new (
+                id INTEGER NOT NULL PRIMARY KEY,
+                username VARCHAR(80) NOT NULL UNIQUE,
+                password_hash VARCHAR(255) NOT NULL,
+                active BOOLEAN NOT NULL,
+                created_at DATETIME NOT NULL,
+                role VARCHAR(20) NOT NULL DEFAULT 'admin',
+                counselor_id INTEGER,
+                FOREIGN KEY(counselor_id) REFERENCES counselor (id) ON DELETE SET NULL
+            )
+            """
+        )
+    )
+    db.session.execute(
+        text(
+            """
+            INSERT INTO admin_user__new (id, username, password_hash, active, created_at, role, counselor_id)
+            SELECT id, username, password_hash, active, created_at, role, counselor_id
+            FROM admin_user
+            """
+        )
+    )
+    db.session.execute(text("DROP TABLE admin_user"))
+    db.session.execute(text("ALTER TABLE admin_user__new RENAME TO admin_user"))
+    db.session.execute(text("CREATE INDEX ix_admin_user_role ON admin_user (role)"))
+    db.session.execute(text("CREATE INDEX ix_admin_user_counselor_id ON admin_user (counselor_id)"))
+    db.session.execute(text("PRAGMA foreign_keys=ON"))
+    db.session.commit()
 
 
 def _ensure_schema() -> None:
@@ -46,8 +104,10 @@ def _ensure_schema() -> None:
         db.session.execute(text("ALTER TABLE admin_user ADD COLUMN counselor_id INTEGER"))
 
     db.session.execute(text("UPDATE admin_user SET role = 'admin' WHERE role IS NULL OR role = ''"))
-
     db.session.commit()
+
+    inspector = inspect(db.engine)
+    _ensure_admin_user_foreign_key(inspector)
 
 
 def create_app() -> Flask:

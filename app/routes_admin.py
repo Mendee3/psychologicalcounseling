@@ -102,6 +102,23 @@ def _set_setting(key: str, value: str) -> None:
         row.value = value
 
 
+def _slot_redirect(*, message: str = "", error: str = ""):
+    today = date.today()
+    params = {
+        "open_section": "slots",
+        "slot_start": _parse_date(request.values.get("slot_start"), today).isoformat(),
+        "slot_end": _parse_date(request.values.get("slot_end"), today + timedelta(days=14)).isoformat(),
+    }
+    slot_counselor_id = request.values.get("slot_counselor_id", type=int)
+    if slot_counselor_id:
+        params["slot_counselor_id"] = slot_counselor_id
+    if message:
+        params["message"] = message
+    if error:
+        params["error"] = error
+    return redirect(url_for("admin.dashboard", **params) + "#slot-management")
+
+
 @admin_bp.get("/login")
 def login():
     if current_user.is_authenticated:
@@ -163,6 +180,11 @@ def dashboard():
     if slot_counselor_id:
         slots_query = slots_query.filter(AvailabilitySlot.counselor_id == slot_counselor_id)
     slots = slots_query.limit(200).all()
+    slot_ids = [slot.id for slot in slots]
+    locked_slot_ids = {
+        slot_id
+        for slot_id, in Appointment.query.filter(Appointment.slot_id.in_(slot_ids)).with_entities(Appointment.slot_id).distinct().all()
+    } if slot_ids else set()
 
     report_rows = _report_rows(report_start, report_end)
 
@@ -172,6 +194,7 @@ def dashboard():
         appointments=appointments,
         admin_users=admin_users,
         slots=slots,
+        locked_slot_ids=locked_slot_ids,
         report_rows=report_rows,
         counselor_users=counselor_users,
         today=today.isoformat(),
@@ -373,6 +396,7 @@ def add_slot():
     session_minutes = request.form.get("session_minutes", type=int) or counselor.session_minutes or 50
     buffer_minutes = request.form.get("buffer_minutes", type=int) or 0
     capacity = request.form.get("capacity", type=int) or 1
+    selected_weekdays = {int(value) for value in request.form.getlist("weekdays") if value.isdigit()}
 
     if session_minutes <= 0:
         return redirect(url_for("admin.dashboard", error="Нэг уулзалтын үргэлжлэх хугацаа 1 минутаас их байна."))
@@ -383,6 +407,8 @@ def add_slot():
     sample_end = datetime.combine(start_date, range_end)
     if sample_start >= sample_end:
         return redirect(url_for("admin.dashboard", error="Эхлэх цаг нь дуусах цагаас өмнө байх ёстой."))
+    if not selected_weekdays:
+        return redirect(url_for("admin.dashboard", error="Давтагдах гарагуудаас дор хаяж нэгийг сонгоно уу."))
 
     created = 0
     skipped = 0
@@ -391,6 +417,9 @@ def add_slot():
     duration = timedelta(minutes=session_minutes)
 
     while day_cursor <= end_date:
+        if day_cursor.weekday() not in selected_weekdays:
+            day_cursor += timedelta(days=1)
+            continue
         cursor = datetime.combine(day_cursor, range_start)
         end_dt = datetime.combine(day_cursor, range_end)
         while cursor + duration <= end_dt:
@@ -419,33 +448,65 @@ def add_slot():
         day_cursor += timedelta(days=1)
 
     db.session.commit()
-    return redirect(url_for("admin.dashboard", message=f"{created} слот нэмэгдлээ. Алгассан: {skipped}."))
+    return _slot_redirect(message=f"{created} слот нэмэгдлээ. Алгассан: {skipped}.")
 
 
 @admin_bp.post("/slots/<int:slot_id>/delete")
 @admin_required
 def delete_slot(slot_id: int):
     slot = AvailabilitySlot.query.get_or_404(slot_id)
+    has_appointments = Appointment.query.filter_by(slot_id=slot.id).first() is not None
+    if has_appointments:
+        return _slot_redirect(error="Энэ слот дээр уулзалтын хүсэлт байгаа тул устгах боломжгүй.")
     db.session.delete(slot)
     db.session.commit()
-    return redirect(url_for("admin.dashboard", message="Слот устгагдлаа."))
+    return _slot_redirect(message="Слот устгагдлаа.")
 
 
 @admin_bp.post("/slots/bulk-delete")
 @admin_required
 def bulk_delete_slots():
+    selected_slot_ids = sorted({int(value) for value in request.form.getlist("slot_ids") if value.isdigit()})
+    if selected_slot_ids:
+        locked_slot_ids = {
+            slot_id
+            for slot_id, in Appointment.query.filter(Appointment.slot_id.in_(selected_slot_ids)).with_entities(Appointment.slot_id).distinct().all()
+        }
+        deletable_slot_ids = [slot_id for slot_id in selected_slot_ids if slot_id not in locked_slot_ids]
+        if not deletable_slot_ids:
+            return _slot_redirect(error="Сонгосон слотууд дээр уулзалтын хүсэлт байгаа тул устгах боломжгүй.")
+
+        removed = AvailabilitySlot.query.filter(AvailabilitySlot.id.in_(deletable_slot_ids)).delete(synchronize_session=False)
+        db.session.commit()
+        if not removed:
+            return _slot_redirect(message="Сонгосон слот олдсонгүй.")
+        if locked_slot_ids:
+            return _slot_redirect(message=f"{removed} слот устгагдлаа. Алгассан: {len(locked_slot_ids)}.")
+        return _slot_redirect(message=f"{removed} слот устгагдлаа.")
+
     slot_counselor_id = request.form.get("slot_counselor_id", type=int)
-    slot_start = date.fromisoformat(request.form.get("slot_start", ""))
-    slot_end = date.fromisoformat(request.form.get("slot_end", ""))
+    try:
+        slot_start = date.fromisoformat(request.form.get("slot_start", ""))
+        slot_end = date.fromisoformat(request.form.get("slot_end", ""))
+    except ValueError:
+        return _slot_redirect(error="Слот устгах огноо буруу байна.")
     if slot_start > slot_end:
-        return redirect(url_for("admin.dashboard", error="Слот устгах мужийн эхлэх өдөр нь дуусахаас өмнө байх ёстой."))
+        return _slot_redirect(error="Слот устгах мужийн эхлэх өдөр нь дуусахаас өмнө байх ёстой.")
 
     query = AvailabilitySlot.query.filter(AvailabilitySlot.slot_date >= slot_start, AvailabilitySlot.slot_date <= slot_end)
     if slot_counselor_id:
         query = query.filter(AvailabilitySlot.counselor_id == slot_counselor_id)
-    removed = query.delete(synchronize_session=False)
+    slot_ids = [slot_id for slot_id, in query.with_entities(AvailabilitySlot.id).all()]
+    if not slot_ids:
+        return _slot_redirect(message="Устгах слот олдсонгүй.")
+
+    has_appointments = Appointment.query.filter(Appointment.slot_id.in_(slot_ids)).first() is not None
+    if has_appointments:
+        return _slot_redirect(error="Шүүсэн слотуудын зарим дээр уулзалтын хүсэлт байгаа тул бөөнөөр устгах боломжгүй.")
+
+    removed = AvailabilitySlot.query.filter(AvailabilitySlot.id.in_(slot_ids)).delete(synchronize_session=False)
     db.session.commit()
-    return redirect(url_for("admin.dashboard", message=f"{removed} слот устгагдлаа."))
+    return _slot_redirect(message=f"{removed} слот устгагдлаа.")
 
 
 @admin_bp.post("/appointments/<int:appointment_id>/status")

@@ -63,7 +63,37 @@
         <input type="hidden" name="counselor_id" value="{{ counselor.id }}" />
         <label>
           Уулзалтын огноо
-          <input id="selected_date" type="date" name="selected_date" value="{{ selected_date }}" min="{{ today }}" required />
+          <input id="selected_date" type="hidden" name="selected_date" value="{{ selected_date }}" required />
+          <div class="calendar-picker" id="calendarPicker">
+            <div class="calendar-toolbar">
+              <a class="calendar-nav-button {% if week_offset == 0 %}disabled{% endif %}" href="{{ url_for('public.home', counselor_id=counselor.id, date=selected_date, week_offset=week_offset - 1 if week_offset > 0 else 0) }}">Өмнөх</a>
+              <button type="button" class="calendar-nav-button calendar-today-button" id="calendarTodayButton" data-date="{{ today }}">Өнөөдөр</button>
+              <a class="calendar-nav-button" href="{{ url_for('public.home', counselor_id=counselor.id, date=selected_date, week_offset=week_offset + 1) }}">Дараагийн</a>
+            </div>
+            <div class="calendar-selected-date" id="selectedDateLabel">{{ selected_date }}</div>
+            <div class="calendar-window-label">{{ calendar_window_label }}</div>
+            <div class="calendar-grid" id="calendarGrid">
+              {% for day in calendar_days %}
+              <button
+                type="button"
+                class="calendar-day {% if day.available %}available{% endif %} {% if day.date == selected_date %}selected{% endif %} {% if day.is_today %}today{% endif %}"
+                data-date="{{ day.date }}"
+                {% if not day.available %}disabled{% endif %}
+              >
+                <span class="calendar-day-weekday">{{ day.weekday }}</span>
+                <strong>{{ day.day }}</strong>
+                <span class="calendar-day-meta">{{ day.month }}</span>
+              </button>
+              {% endfor %}
+            </div>
+            {% if not has_available_days %}
+            <p class="calendar-help" id="calendarHelpText" data-empty-message="Одоогоор энэ сэтгэлзүйчид дараагийн өдрүүдэд нээлттэй хуваарь алга." data-no-slots-message="Энэ сэтгэлзүйчид сонгогдсон өдөр сул цаг алга. Тодруулсан өдрүүдээс сонгоно уу." data-default-message="Боломжит цагаа доороос сонгоно уу.">Одоогоор энэ сэтгэлзүйчид дараагийн өдрүүдэд нээлттэй хуваарь алга.</p>
+            {% elif calendar_days and not slots %}
+            <p class="calendar-help" id="calendarHelpText" data-empty-message="Одоогоор энэ сэтгэлзүйчид дараагийн өдрүүдэд нээлттэй хуваарь алга." data-no-slots-message="Энэ сэтгэлзүйчид сонгогдсон өдөр сул цаг алга. Тодруулсан өдрүүдээс сонгоно уу." data-default-message="Боломжит цагаа доороос сонгоно уу.">Энэ сэтгэлзүйчид сонгогдсон өдөр сул цаг алга. Тодруулсан өдрүүдээс сонгоно уу.</p>
+            {% else %}
+            <p class="calendar-help" id="calendarHelpText" data-empty-message="Одоогоор энэ сэтгэлзүйчид дараагийн өдрүүдэд нээлттэй хуваарь алга." data-no-slots-message="Энэ сэтгэлзүйчид сонгогдсон өдөр сул цаг алга. Тодруулсан өдрүүдээс сонгоно уу." data-default-message="Боломжит цагаа доороос сонгоно уу.">Боломжит цагаа доороос сонгоно уу.</p>
+            {% endif %}
+          </div>
         </label>
         <label>
           Боломжит цаг
@@ -124,8 +154,9 @@
         {% for item in counselor_summaries %}
         <a
           class="directory-card directory-card-link {% if counselor and item.id == counselor.id %}selected{% endif %}"
+          data-counselor-id="{{ item.id }}"
           data-search="{{ (item.name ~ ' ' ~ item.title ~ ' ' ~ item.location ~ ' ' ~ item.bio)|lower }}"
-          href="{{ url_for('public.home', counselor_id=item.id, date=selected_date) }}"
+          href="{{ url_for('public.home', counselor_id=item.id, date=selected_date, week_offset=week_offset) }}"
         >
           <div class="directory-card-photo">
             {% if item.photo_path %}
@@ -137,7 +168,7 @@
           <div class="directory-card-body">
             <h3>{{ item.name }}</h3>
             <p class="card-subtitle">{{ item.title }}</p>
-            <div class="availability-row">{{ item.available_count }} боломжит слот</div>
+            <div class="availability-row" data-availability-row>{{ item.available_count }} боломжит слот</div>
             <p class="card-description">{{ item.bio or 'Ажилтнуудад зориулсан нууцлалтай сэтгэлзүйн зөвлөгөө.' }}</p>
             <div class="chip-row">
               <span class="pill">{{ item.session_minutes }} минут</span>
@@ -153,6 +184,7 @@
 </div>
 <script>
   const counselorSelectionScrollKey = 'public-home-selection-scroll-y';
+  const counselorSelectionRestoreKey = 'public-home-selection-restore-pending';
   const dateInput = document.getElementById('selected_date');
   const slotSelect = document.getElementById('slot_id');
   const searchInput = document.getElementById('directorySearch');
@@ -160,7 +192,41 @@
   const resultCount = document.getElementById('resultCount');
   const recommendationToggle = document.getElementById('recommendationToggle');
   const recommendationDrawer = document.getElementById('recommendationDrawer');
+  const calendarButtons = Array.from(document.querySelectorAll('.calendar-day'));
+  const selectedDateLabel = document.getElementById('selectedDateLabel');
+  const todayButton = document.getElementById('calendarTodayButton');
+  const calendarHelpText = document.getElementById('calendarHelpText');
   const selectedCounselorId = {{ counselor.id if counselor else 'null' }};
+  const currentWeekOffset = {{ week_offset }};
+
+  function syncSelectedDateLabel() {
+    if (!selectedDateLabel || !dateInput || !dateInput.value) return;
+    selectedDateLabel.textContent = dateInput.value;
+  }
+
+  function syncCalendarSelection() {
+    if (!dateInput) return;
+    calendarButtons.forEach((button) => {
+      button.classList.toggle('selected', button.dataset.date === dateInput.value);
+    });
+    syncSelectedDateLabel();
+  }
+
+  function syncCalendarHelp(slotCount) {
+    if (!calendarHelpText) return;
+    const emptyMessage = calendarHelpText.dataset.emptyMessage || '';
+    const noSlotsMessage = calendarHelpText.dataset.noSlotsMessage || '';
+    const defaultMessage = calendarHelpText.dataset.defaultMessage || '';
+    if (!selectedCounselorId) {
+      calendarHelpText.textContent = defaultMessage;
+      return;
+    }
+    if (!calendarButtons.some((button) => !button.disabled)) {
+      calendarHelpText.textContent = emptyMessage;
+      return;
+    }
+    calendarHelpText.textContent = slotCount > 0 ? defaultMessage : noSlotsMessage;
+  }
 
   async function refreshSlots() {
     if (!dateInput || !slotSelect || !dateInput.value || !selectedCounselorId) return;
@@ -173,6 +239,28 @@
       opt.textContent = `${row.label} · ${row.remaining} сул`;
       slotSelect.appendChild(opt);
     }
+    syncCalendarSelection();
+    syncCalendarHelp(rows.length);
+    await refreshCounselorSummaries();
+  }
+
+  async function refreshCounselorSummaries() {
+    if (!dateInput || !dateInput.value) return;
+    const res = await fetch(`/api/counselor-summaries?date=${encodeURIComponent(dateInput.value)}`);
+    const rows = await res.json();
+    const countsById = new Map(rows.map((row) => [String(row.id), row.available_count]));
+    cards.forEach((card) => {
+      const counselorId = card.dataset.counselorId;
+      const availabilityRow = card.querySelector('[data-availability-row]');
+      if (availabilityRow) {
+        const count = countsById.get(counselorId) ?? 0;
+        availabilityRow.textContent = `${count} боломжит слот`;
+      }
+      const url = new URL(card.href, window.location.origin);
+      url.searchParams.set('date', dateInput.value);
+      url.searchParams.set('week_offset', String(currentWeekOffset));
+      card.href = `${url.pathname}?${url.searchParams.toString()}`;
+    });
   }
 
   function filterCards() {
@@ -188,12 +276,15 @@
 
   function rememberScrollPosition() {
     window.sessionStorage.setItem(counselorSelectionScrollKey, String(window.scrollY));
+    window.sessionStorage.setItem(counselorSelectionRestoreKey, '1');
   }
 
   function restoreScrollPosition() {
+    const shouldRestore = window.sessionStorage.getItem(counselorSelectionRestoreKey);
     const savedScrollY = window.sessionStorage.getItem(counselorSelectionScrollKey);
-    if (!savedScrollY) return;
+    if (!shouldRestore || !savedScrollY) return;
     window.sessionStorage.removeItem(counselorSelectionScrollKey);
+    window.sessionStorage.removeItem(counselorSelectionRestoreKey);
     window.requestAnimationFrame(() => {
       window.scrollTo({ top: Number(savedScrollY), behavior: 'auto' });
     });
@@ -214,6 +305,23 @@
   if (dateInput) {
     dateInput.addEventListener('change', refreshSlots);
   }
+  calendarButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      if (!dateInput || button.disabled) return;
+      dateInput.value = button.dataset.date;
+      refreshSlots();
+    });
+  });
+  if (todayButton) {
+    todayButton.addEventListener('click', () => {
+      const params = new URLSearchParams({ date: todayButton.dataset.date, week_offset: '0' });
+      if (selectedCounselorId) params.set('counselor_id', String(selectedCounselorId));
+      window.location.href = `/?${params.toString()}`;
+    });
+  }
+  syncCalendarSelection();
+  syncCalendarHelp(Math.max(slotSelect ? slotSelect.options.length - 1 : 0, 0));
+  refreshCounselorSummaries();
   searchInput.addEventListener('input', filterCards);
 </script>
 {% endblock %}

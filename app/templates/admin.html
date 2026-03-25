@@ -86,6 +86,18 @@
           </label>
           <label>Эхлэх өдөр<input type="date" name="start_date" value="{{ today }}" required /></label>
           <label>Дуусах өдөр<input type="date" name="end_date" value="{{ today }}" required /></label>
+          <fieldset class="weekday-picker">
+            <legend>Давтах гараг</legend>
+            <div class="chip-row">
+              <label class="checkbox"><input type="checkbox" name="weekdays" value="0" checked /> Даваа</label>
+              <label class="checkbox"><input type="checkbox" name="weekdays" value="1" checked /> Мягмар</label>
+              <label class="checkbox"><input type="checkbox" name="weekdays" value="2" checked /> Лхагва</label>
+              <label class="checkbox"><input type="checkbox" name="weekdays" value="3" checked /> Пүрэв</label>
+              <label class="checkbox"><input type="checkbox" name="weekdays" value="4" checked /> Баасан</label>
+              <label class="checkbox"><input type="checkbox" name="weekdays" value="5" checked /> Бямба</label>
+              <label class="checkbox"><input type="checkbox" name="weekdays" value="6" checked /> Ням</label>
+            </div>
+          </fieldset>
           <label>Өдөр бүрийн эхлэх цаг<input type="time" name="range_start" required /></label>
           <label>Өдөр бүрийн дуусах цаг<input type="time" name="range_end" required /></label>
           <label>Нэг слотын үргэлжлэх хугацаа<input type="number" name="session_minutes" min="15" value="50" required /></label>
@@ -142,41 +154,68 @@
           <button type="submit" class="secondary">Шүүх</button>
         </form>
       </div>
-      <form method="post" action="{{ url_for('admin.bulk_delete_slots') }}" class="inline-danger-form">
-        <input type="hidden" name="slot_start" value="{{ slot_start }}" />
-        <input type="hidden" name="slot_end" value="{{ slot_end }}" />
-        <input type="hidden" name="slot_counselor_id" value="{{ slot_counselor_id or '' }}" />
-        <button type="submit" class="secondary danger">Шүүсэн слотуудыг бөөнөөр устгах</button>
-      </form>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Огноо</th>
-              <th>Цаг</th>
-              <th>Сэтгэлзүйч</th>
-              <th>Багтаамж</th>
-              <th>Үйлдэл</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for slot in slots %}
-            <tr>
-              <td>{{ slot.slot_date.isoformat() }}</td>
-              <td>{{ slot.label }}</td>
-              <td>{{ slot.counselor.name }}</td>
-              <td>{{ slot.capacity }}</td>
-              <td>
-                <form method="post" action="{{ url_for('admin.delete_slot', slot_id=slot.id) }}">
-                  <button type="submit" class="secondary small danger">Устгах</button>
-                </form>
-              </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="5">Сонгосон мужид слот алга.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="slot-management-tools">
+        <form method="post" action="{{ url_for('admin.bulk_delete_slots') }}" class="inline-danger-form">
+          <input type="hidden" name="slot_start" value="{{ slot_start }}" />
+          <input type="hidden" name="slot_end" value="{{ slot_end }}" />
+          <input type="hidden" name="slot_counselor_id" value="{{ slot_counselor_id or '' }}" />
+          <button type="submit" class="secondary danger">Шүүсэн слотуудыг бөөнөөр устгах</button>
+        </form>
+
+        <form method="post" action="{{ url_for('admin.bulk_delete_slots') }}" data-slot-selection-form>
+          <input type="hidden" name="slot_start" value="{{ slot_start }}" />
+          <input type="hidden" name="slot_end" value="{{ slot_end }}" />
+          <input type="hidden" name="slot_counselor_id" value="{{ slot_counselor_id or '' }}" />
+
+          <div class="slot-selection-toolbar">
+            <label class="checkbox slot-select-all">
+              <input type="checkbox" data-slot-toggle-all {% if not slots or slots|length == locked_slot_ids|length %}disabled{% endif %} />
+              Бүгдийг сонгох
+            </label>
+            <button type="submit" class="secondary danger" data-slot-delete-selected {% if not slots or slots|length == locked_slot_ids|length %}disabled{% endif %}>Сонгосон слотуудыг устгах</button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="slot-select-column">Сонгох</th>
+                  <th>Огноо</th>
+                  <th>Цаг</th>
+                  <th>Сэтгэлзүйч</th>
+                  <th>Багтаамж</th>
+                  <th>Төлөв</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for slot in slots %}
+                <tr>
+                  <td class="slot-select-column">
+                    {% if slot.id in locked_slot_ids %}
+                    <input type="checkbox" disabled title="Энэ слот дээр уулзалтын хүсэлт байгаа тул устгах боломжгүй." />
+                    {% else %}
+                    <input type="checkbox" name="slot_ids" value="{{ slot.id }}" data-slot-checkbox />
+                    {% endif %}
+                  </td>
+                  <td>{{ slot.slot_date.isoformat() }}</td>
+                  <td>{{ slot.label }}</td>
+                  <td>{{ slot.counselor.name }}</td>
+                  <td>{{ slot.capacity }}</td>
+                  <td>
+                    {% if slot.id in locked_slot_ids %}
+                    <span class="pill">Хүсэлттэй</span>
+                    {% else %}
+                    <span class="pill">Устгах боломжтой</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6">Сонгосон мужид слот алга.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </form>
       </div>
     </div>
   </details>
@@ -368,9 +407,9 @@
           <tbody>
             {% for appointment in appointments %}
             <tr>
-              <td>{{ appointment.slot.slot_date.isoformat() }}</td>
-              <td>{{ appointment.slot.label }}</td>
-              <td>{{ appointment.counselor.name }}</td>
+              <td>{{ appointment.slot.slot_date.isoformat() if appointment.slot else '-' }}</td>
+              <td>{{ appointment.slot.label if appointment.slot else 'Устсан слот' }}</td>
+              <td>{{ appointment.counselor.name if appointment.counselor else 'Устсан сэтгэлзүйч' }}</td>
               <td>{{ appointment.client_name }}</td>
               <td>{{ appointment.client_department or '-' }}</td>
               <td>{{ appointment.client_phone }}</td>
@@ -396,4 +435,40 @@
   </details>
 </div>
 <script src="{{ url_for('static', filename='admin_photo_upload.js') }}"></script>
+<script>
+(() => {
+  const slotForm = document.querySelector('[data-slot-selection-form]');
+  if (!slotForm) return;
+
+  const toggleAll = slotForm.querySelector('[data-slot-toggle-all]');
+  const slotCheckboxes = Array.from(slotForm.querySelectorAll('[data-slot-checkbox]'));
+  const deleteButton = slotForm.querySelector('[data-slot-delete-selected]');
+
+  const syncState = () => {
+    const checkedCount = slotCheckboxes.filter((input) => input.checked).length;
+    if (toggleAll) {
+      toggleAll.checked = slotCheckboxes.length > 0 && checkedCount === slotCheckboxes.length;
+      toggleAll.indeterminate = checkedCount > 0 && checkedCount < slotCheckboxes.length;
+    }
+    if (deleteButton) {
+      deleteButton.disabled = checkedCount === 0;
+    }
+  };
+
+  if (toggleAll) {
+    toggleAll.addEventListener('change', () => {
+      slotCheckboxes.forEach((input) => {
+        input.checked = toggleAll.checked;
+      });
+      syncState();
+    });
+  }
+
+  slotCheckboxes.forEach((input) => {
+    input.addEventListener('change', syncState);
+  });
+
+  syncState();
+})();
+</script>
 {% endblock %}
